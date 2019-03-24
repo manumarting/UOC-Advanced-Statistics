@@ -1,0 +1,980 @@
+---
+title: "PEC1 Preprocesamiento de los datos"
+author: "Luis Manuel Martin Guerra"
+date: "24/3/2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introducción
+
+Los datos a tratar corresponden a un análisis sobre la satisfacción laboral de los trabajadores de una empresa con el objetivo de investigar si la satisfacción laboral de los trabajadores de la empresa está relacionada con la calificación del trabajo y con el nivel de estudios entre otras variables.
+
+Los datos recogidos por cada trabajador son: la ciudad donde se ubica el puesto de trabajo, el sexo, el nivel de estudios (1: sin estudios, 2: estudios primarios, 3: educación secundaria o educación profesional, 4: universitarios), el tipo de trabajo que realiza (C: cualificado, PC: poco cualificado), la satisfacción laboral del trabajador (comprendida entre 0 y 10), la edad (años), la antiguedad (años), dias de baja en el último año laboral, si tuvo (1) o no baja (0) en el último año laboral (binaria), las horas que trabaja a la semana en promedio, nivel de colesterol en la penultima revisión médica (mmol/L), nivel de colesterol en la última revisión médica (mmol/L).
+
+El archivo se denomina rawData.csv, contiene 1920 registros y 12 variables. Estas variables son: city, sex, educ_level, job_type, happiness, age, seniority, sick_leave, sick_leave_b, work_hours, Cho_initial, Cho_final  
+
+## Preprocesamiento de los datos
+
+El objetivo de la activdad es preparar el archivo para su posterior análisis. Para llevarlo a cabo se realizarán una serie de preprocesamientos:  
+
+1. Carga del archivo de datos.    
+2. Tipos de variables estadísticas presentes.  
+3. Correción de posibles errores de variables.  
+4. Normalizar / Estandarizar las variables cuantitativas.  
+5. Normalizar / Estandarizar las variables cualitativas.  
+6. Tratamiento de valores perdidos.  
+7. Búsqueda de valores atípicos.  
+8. Breve estudio descriptivo.  
+9. Creación del archivo corregido.  
+
+
+## Criterios a aplicar en el preprocesamiento
+
+Cuando se realiza un preprocesamiento, el analista decide como estandarizar/normalizar las variables. Para ello, establece unos criterios, que idealmente se escriben para homogeneizar versiones o para posteriores preprocesamientos que aparezcan sobre nuevos datos.   
+
+Los criterios que se seguirán para la realización del preprocesado son los siguentes:  
+
+* El punto (.) es el separador decimal de cualquier variable numérica.  
+
+* Los valores de la variable work_hours se estandarizan en una cifra decimal.  
+
+* Los nombres de las ciudades se estandarizan con la primera letra de cada palabra en mayúsculas (excepto preposiciones) y el resto en minúsculas. Por ejemplo: Barcelona, Las Palmas de Gran Canaria,...  
+
+* Los nombres de género se estandarizan como M y F.  
+
+* El nivel de estudios se estandariza con la siguiente abreviatura donde aparece el valor 1 cambiar por el valor N, donde aparece el valor 2 cambiar por el valor P, donde aparece el valor 3 cambiar por el valor S, donde aparece el valor 4 cambiar por el valor U. Siendo N: sin estudios, P: estudios primarios, S: educación secundaria o educación profesional, U: universitarios.  
+
+* El tipo de trabajo se estandariza con la siguiente abreviatura donde aparece el valor 1 cambiar por el valor C, donde aparece el valor 2 cambiar por el valor PC. Siendo C trabajo cualificado y PC poco cualificado.
+
+* La inconsistencia entre las variables age vs seniority se produce cuando un trabajador tiene una diferencia entre edad (age) y antiguedad (seniority) menor de 18 años. El criterio de corrección es asignar a la variable antiguedad la edad del trabajador menos 18 años.  
+
+* Otra inconsistencia puede ser la provocada por valores negativos en el número de horas semanales promedio (work_hours). El criterio de correción es pasar el valor a positivo.
+
+
+  
+## 1. Carga del archivo de datos  
+
+Antes de decidir que función emplear para cargar el fichero de datos, inspeccionamos el archivo .csv para ver en que tipo de formato se encuentra.
+
+En este caso concreto. observamos que se trata de un formato .csv inglés, en el que el separador de campos es la coma "," y el separador de decimales es el punto "."
+
+Por lo tanto emplearemos la instrucción read.table para cargar el fichero csv, a la que le indicaremos que queremos que cargue las cabeceras, que los valores ausentes los trate como "NA" y que emplee como separador decimal el punto y como separador de columnas la coma.  
+
+
+
+```{r warning=FALSE, include=TRUE}
+trabajadores <- read.table(
+  "/Users/manu/Documents/UOC - Ciencia de Datos/2 - Estadistica avanzada/PEC 1/rawData.csv",
+  header=TRUE, sep=",", na.strings="NA", dec=".", strip.white=TRUE)
+```
+Una vez cargado el fichero, vamos a realiar una primera exploración de los datos, mediante la instrucción _summary()_
+
+```{r sumario_variables}
+summary(trabajadores)
+```
+Seguidamente, vamos a confirmar que se han cargado todos los registros y que se han identificado todas las variables:  
+
+```{r}
+dim(trabajadores)
+```
+Con esto confirmamos que se han cargado los 1920 registros que contienen 12 variables, tal y como se nos indicaba en el enunciado de la práctica.  
+
+
+## 2. Tipos de variables estadísticas presentes  
+
+Para conocer el tipo de datos de las diferenes variables, empleamos la función _class_, aplicada a todo el dataset
+```{r}
+sapply(trabajadores, class)
+```
+Vemos que R nos indica que _happines_, _city_, y _sex_ son variables de tipo "factor", es decir variables de tipo cualitativos, mientras que el resto son de tipo cuantitativos.  
+
+De entre estos últimos nos encontramos con que *educ_level*, *job_tye* , *age*, _seniority_, *sick_leav* y *sick_leave_b* son discretas y que *work_hours*, *Cho_initial* y *Cho_final* son continuas.
+
+  
+## 3. Correción de errores de asignación de tipos
+
+Vemos que R ha detectado que *job_type*, *educ_level*, *happiness* y *sick_leave_b* tienen un tipo de variable que no les corresponde, ya que según los criterios mencionados anteriormente, deberían ser de tipo factor, mientras que happiness debería ser de tipo numérico.
+
+
+### 3.1 Nivel de estudios (educ_level)
+
+La transformamos de integer a factor, para ello empleamos la función as.factor
+
+```{r}
+trabajadores$educ_level <-as.factor(trabajadores$educ_level)
+```
+### 3.2 Tipo de trabajo(job_type) y Ha causado baja (sick_leave_b)
+
+Hacemos lo mismo, con *job_type* y con *sick_leave_b*. En el caso de *sick_leave_b* esta variable puede tomar valores bien de 0, bien de 1, por lo tanto se comporta como una variable de tipo factor, con dos niveles, 0 y 1. Es por ello que vamos a convertir su tipo en factor.
+
+```{r}
+trabajadores$job_type <- as.factor(trabajadores$job_type)
+
+trabajadores$sick_leave_b<- as.factor(trabajadores$sick_leave_b)
+```
+### 3.3 Satisfacción laboral (happiness)
+
+Por último, transformaremos la variable _happiness_, de factor a numeric. 
+
+Para ello, primero la convertiremos a tipo character:
+```{r warning=FALSE}
+trabajadores$happiness <- as.character(trabajadores$happiness)
+```
+Una vez la tenemos como tipo character, nos aseguraremos que los separadores decimales se han identificado correctamente, es decir, que todos los valores tienen como separador el punto decimal (.) y no la coma (,).
+
+Cargamos las librerías stringi y SGP para tratar las cadenas de caracteres.
+
+```{r}
+library(stringi)
+library(SGP)
+```
+
+Ahora sustituiremos las posibles comas que pudieran aparecer en el conjunto de datos de la variable, por puntos.
+```{r}
+trabajadores$happiness <-stri_replace_all_fixed(trabajadores$happiness, 
+                                                c(","), 
+                                                c("."), vectorize_all = FALSE)
+
+```
+Seguidamente, convertimos a numeric el tipo de datos de la variables *happiness*
+
+```{r}
+trabajadores$happiness <- as.numeric(trabajadores$happiness)
+```
+
+### 3.4 Comprobaciones finales
+
+Por último comprobamos que los tipos de datos de las variables se han convertido correctamente:
+
+```{r}
+sapply(trabajadores, class)
+```
+
+## 4. Normalizar / Estandarizar las variables cuantitativas.
+
+En este punto vamos a estandarizar los valores de las variables cuantitativas del dataset, (*happiness*, *age*, *seniority*, *sick_leave*, *work_hours*, *Cho_initial* y *Cho_final*).
+
+### 4.1 Happiness
+
+Para eliminar inconsistencias con posibles valores negativos, vamos a aplicar el valor del cálculo absoluto a todos los valores de esta variable:
+
+```{r}
+trabajadores$happiness <- sapply(trabajadores$happiness, abs)
+```
+Comprobamos como han quedado los valores:
+
+```{r}
+head(trabajadores$happiness)
+```
+
+### 4.2 Edad (age)
+
+Aplicamos el valor del cálculo del valor absoluto a los valores de esta variable, para eliminar la posible existencia de valores negativos:
+```{r}
+trabajadores$age <- sapply(trabajadores$age, abs)
+```
+
+Comprobamos como han quedado los valores:
+
+```{r}
+head(trabajadores$age)
+```
+
+
+### 4.3 Antigüedad (seniority)
+
+En esta variable pueden tener inconsistencia en los valores debido a la presencia de negativos. Para prevenir esta posible situación, asignaremos como valores de esta variable el resultado de calcular el valor del campo edad menos 18:
+
+```{r}
+trabajadores$seniority <- trabajadores$age -18
+```
+Comprobamos como han quedado los valores:
+
+```{r}
+head(trabajadores$seniority)
+```
+
+### 4.4 Dias de baja (sick_leave)
+
+Esta variable es de tipo numérico y por lo tanto debemos asegurarnos, que los separadores decimales se han detectado correctamtente.
+
+Pasamos a tipo character los valores de la variable:
+
+```{r}
+trabajadores$sick_leave <- as.character(trabajadores$sick_leave)
+```
+Reemplazamos las posibles comas que pudieran aparecer por puntos:
+
+```{r}
+trabajadores$sick_leave <-stri_replace_all_fixed(trabajadores$sick_leave, 
+                                                 c(","), 
+                                                 c("."), vectorize_all = FALSE)
+```
+
+Convertimos nuevamente a tipo numeric:
+
+```{r}
+trabajadores$sick_leave <- as.numeric(trabajadores$sick_leave)
+```
+Aplicamos el valor del cálculo del valor absoluto a los valores de esta variable, para eliminar la posible existencia de valores negativos:
+
+```{r}
+trabajadores$sick_leave <-sapply(trabajadores$sick_leave, abs)
+```
+Comprobamos como han quedado los valores:
+
+```{r}
+head(trabajadores$sick_leave)
+```
+
+
+### 4.5 Horas de trabajo semanales (work_hours)
+
+Esta variable es de tipo numérico y por lo tanto debemos asegurarnos, al igual que hicimos anteriormente con *happiness* que los separadores decimales se han detectado correctamtente.
+
+Pasamos a tipo character los valores de la variable:
+
+```{r}
+trabajadores$work_hours <- as.character(trabajadores$work_hours)
+```
+Reemplazamos las posibles comas que pudieran aparecer por puntos:
+
+```{r}
+trabajadores$work_hours <-stri_replace_all_fixed(trabajadores$work_hours, 
+                                                 c(","), 
+                                                 c("."), vectorize_all = FALSE)
+```
+
+Convertimos nuevamente a tipo numeric:
+
+```{r}
+trabajadores$work_hours <- as.numeric(trabajadores$work_hours)
+```
+Aplicamos el valor del cálculo del valor absoluto a los valores de esta variable, para eliminar la posible existencia de valores negativos:
+
+```{r}
+trabajadores$work_hours <-sapply(trabajadores$work_hours, abs)
+```
+
+Además, estandarizamos los valores para que tengan una cifra decimal:
+
+```{r}
+trabajadores$work_hours<-round(trabajadores$work_hours, 1)
+```
+Comprobamos como han quedado los valores: 
+
+```{r}
+head(trabajadores$work_hours)
+```
+### 4.6 Nivel de colesterol en la penúltima revisión (cho_initial)
+
+Esta variable es de tipo numérico y por lo tanto debemos asegurarnos, que los separadores decimales se han detectado correctamtente.
+
+Pasamos a tipo character los valores de la variable:
+
+```{r}
+trabajadores$Cho_initial <- as.character(trabajadores$Cho_initial)
+```
+Reemplazamos las posibles comas que pudieran aparecer por puntos:
+
+```{r}
+trabajadores$Cho_initial <-stri_replace_all_fixed(trabajadores$Cho_initial, 
+                                                  c(","), 
+                                                  c("."), vectorize_all = FALSE)
+```
+
+Convertimos nuevamente a tipo numeric:
+
+```{r}
+trabajadores$Cho_initial <- as.numeric(trabajadores$Cho_initial)
+```
+Aplicamos el valor del cálculo del valor absoluto a los valores de esta variable, para eliminar la posible existencia de valores negativos:
+
+```{r}
+trabajadores$Cho_initial <-sapply(trabajadores$Cho_initial, abs)
+```
+Comprobamos como han quedado los valores:
+
+
+```{r}
+head(trabajadores$Cho_initial)
+```
+
+### 4.7 Niveles de colesterol en la última revisión (cho_final)
+
+Esta variable es de tipo numérico y por lo tanto debemos asegurarnos, que los separadores decimales se han detectado correctamtente.
+
+Pasamos a tipo character los valores de la variable:
+
+```{r}
+trabajadores$Cho_final <- as.character(trabajadores$Cho_final)
+```
+Reemplazamos las posibles comas que pudieran aparecer por puntos:
+
+```{r}
+trabajadores$Cho_final <-stri_replace_all_fixed(trabajadores$Cho_final, 
+                                                c(","), 
+                                                c("."), vectorize_all = FALSE)
+```
+
+Convertimos nuevamente a tipo numeric:
+
+```{r}
+trabajadores$Cho_final <- as.numeric(trabajadores$Cho_final)
+```
+Aplicamos el valor del cálculo del valor absoluto a los valores de esta variable, para eliminar la posible existencia de valores negativos:
+
+```{r}
+trabajadores$Cho_final <-sapply(trabajadores$Cho_final, abs)
+```
+Comprobamos como han quedado los valores:
+
+```{r}
+head(trabajadores$Cho_final)
+```
+
+Con esto, ya tenemos todas las variables cuantitativas estandarizadas según los criterios de preprocesamiento establecidos al principio de este documento.  
+
+## 5. Normalizar / Estandarizar las variables cualitativas. 
+
+A continuación vamos a aplicar las transformaciones correspondientes para estandarizar las variables cualitatitvas *city*, *sex*, *educ_level*, *job_type* y *sick_leave*, conforme a los criterios de preprocesamiento.
+
+
+### 5.1 Ciudad (city)
+
+Ahora mismo tenemos:
+
+```{r}
+summary(trabajadores$city)
+```
+Vemos que hay tres ciudades, pero cuyos valores no están estandarizados. Hay nombres con espacios en blanco delante, todas las letras en minúsculas, etc.
+
+Primero aplicamos la función *capwords*, para convertir la primera letra de cada palabra en mayúsculas y además eliminar los espacios en blanco que pudieran existir por delante y por detrás.
+
+```{r}
+trabajadores$city<- sapply(trabajadores$city, capwords)
+```
+
+Además de todas las funcionalidades anteriormente descritas, *capwords* convierte el tipo de datos de los valores de la variable *city* a tipo character, con lo que nos facilita la siguiente transformación a realizar, que es sustituir la primera letra de las preposiciones que pudiera contener el nombre de la ciudad, de mayúsculas a minúsculas.
+
+Para llevar a cabo el reemplazo, vamos a crear un vector de preposiciones, en el que todas las posibles preposiciones empleadas en nombres de ciudades, están en minúsculas y ademas tienen un espacio en blanco por delante y por detrás.
+
+```{r warning=FALSE}
+preposiciones <-c(" de ", " del ", " de la "," de los ")
+```
+
+Ahora crearemos otro vector, con igual que el anterior, pero con la primera letra de cada preposición en mayúsuculas:
+
+```{r warning=FALSE}
+preposiciones_capital <-c(" De "," Del ", " De La ", " De Los ")
+```
+El siguiente paso es emplear la función stri_replace_all_fixed para sustituir las preposiciones que pudieran contener los valores de la variable, por sus correspondientes, pero en minúsuculas:
+
+```{r}
+trabajadores$city <-stri_replace_all_fixed(trabajadores$city, 
+                                           preposiciones_capital, 
+                                           preposiciones, vectorize_all = FALSE)
+```
+
+Finalmente, convertimos de nuevo el tipo de datos de la variable *city* de character a factor:
+
+```{r}
+trabajadores$city <-as.factor(trabajadores$city)
+class(trabajadores$city)
+```
+
+Comprobamos que efectivamente hay 3 niveles para los valores de esta variable:
+```{r}
+summary(trabajadores$city)
+```
+### 5.2 Género (sex)
+
+Al igual que hemos hecho con la variable *city*, vamos a comprobar los valores introducidos para esta variable:
+
+```{r}
+summary(trabajadores$sex)
+```
+
+Vemos que hay realmente solo existen dos niveles, F y M. Sin embargo los valores introducidos representan variaciones en mayúsculas/minúsculas, y en espacios en blanco por delante y por detrás.
+
+Por lo tanto, aplicaremos la función capwords, para eliminar los espacios en blanco y transformar en mayúsuclas todas las letras:
+
+```{r}
+trabajadores$sex <- sapply(trabajadores$sex, capwords)
+```
+Al igual que hicimos con *sex*, ahora volvemos a transformar el tipo de variable, de character a factor:
+
+```{r}
+trabajadores$sex <- as.factor(trabajadores$sex)
+```
+Finalmente comprobamos que los valores se han transformado correctamente:
+
+```{r}
+head(trabajadores$sex)
+```
+
+
+### 5.3 Nivel de estudios (educ_level)
+
+Esta variable se transformó a tipo factor en el apartado 3, así que en este punto, aplicaremos las etiquetas correspondientes a los diferentes niveles que puede tomar la variable.
+
+```{r}
+trabajadores$educ_level <-factor(trabajadores$educ_level, 
+                          levels= c(1,2,3,4), labels =c("N", "P", "S", "U"))
+```
+
+Comprobamos que se han aplicado:
+
+```{r}
+head(trabajadores$educ_level)
+```
+
+### 5.4 Tipo de trabajo (job_level)
+
+Al igual que con *educ_level*, ya lo transformamos en el apartado 3, así que aplicaremos las etiquetas correspondientes a los diferentes niveles que puede tomar:
+
+```{r}
+trabajadores$job_type <- factor(trabajadores$job_type, 
+                                levels =c(1,2), labels=c("C","PC"))
+```
+
+Comprobamos los resultados:
+
+```{r}
+head(trabajadores$job_type)
+```
+
+### 5.5 Baja laboral (sick_leave_b)
+
+Al haber transformado el tipo de variable en el apartado 3, aplicaremos las etiquetas de 1=TRUE y 0=FALSE, como etiquetas de los niveles de esta variable:
+
+```{r}
+trabajadores$sick_leave_b<- factor(trabajadores$sick_leave_b, 
+                                   levels=c(0,1), labels=c("F","T"))
+```
+
+Comprobamos los resultados:
+
+```{r}
+head(trabajadores$sick_leave_b)
+```
+
+## 6. Tratamiento de valores perdidos.  
+
+Una vez que tenemos los valores de las diferentes variables estandarizados, vamos a realizar el tratamiento de los valores nulos que pudieran existir.
+
+Para ello vamos a obtener los posibles valores nulos, que en la carga del archivo, hemos indicado que se identificasen como NA.
+
+Empleamos la función *is.na.data.frame()* para que nos devuelve un dataframe con los valores TRUE o FALSE para cada variable, dependiendo de si tiene valor NA (TRUE) o no (FALSE)
+
+```{r}
+valores_na <-is.na.data.frame(trabajadores)
+table(valores_na)
+```
+Vemos que efectivamente hay 12 registros en todo el dataset que contienen valores perdidos, identificados como NA.
+
+Una primera opción que nos podríamos plantear sería la eliminación de dichos valores nulos, ya que únicamente representan el 0,0005% del conjunto de valores del archivo.
+
+Sin embargo, tal y como se indica en el enunciado de este ejercicio, optaremos por imputar dichos valores perdidos a partir de los *k-vecinos* más cercanos a dichos valores, usando la distancia de Gower con la información de todas las variables.
+
+### 6.1 Búsqueda y localización de valores perdidos
+
+El dataset contine 12 registros identificados como NA's, por lo que el siguiente paso es averiguar que variables y registros son los que contienen esos valores perdidos.
+
+Hacemos una primera aproximación con el resumen obtenido en el comando anterior:
+
+```{r}
+summary(valores_na)
+```
+Esto nos muestra que los valores perdidos se encuentran únicamente en la variable happiness, ya que es la única que tiene registros TRUE.
+
+Para conocer exactamente los registros con valores perdidos, emplearemos la función *which* que nos devolverá la posición de los registros que tienen el valor TRUE (es decir, está identificado como un NA):
+
+```{r}
+happiness_nas<-is.na(trabajadores$happiness)
+happines_nas_position <- which(happiness_nas, arr.ind = TRUE)
+length((happines_nas_position))
+```
+Comprobamos que efectivamente tenemos los 12 registros con valores perdidos o NA's de *happiness*. Si queremos conocer exactamente cuales son, basta con hacer:
+```{r}
+happines_nas_position
+```
+
+Con esto obtenemos las posiciones correspondientes a 12 registros marcados como valores NA's.
+
+### 6.2 Imputación de valores perdidos
+
+Una vez que hemos detectado que nuestro dataset contiene elementos perdidos (NA's) vamos a proceder a imputar esos valores perdidos a partir de los *k-vecinos* más cercanos a dichos valores, usando la distancia de Gower con la información de todas las variables.
+
+Para ello emplearemos la función *kNN()* de la libreria *VIM* 
+
+```{r message=FALSE, warning=FALSE}
+library(VIM)
+
+```
+
+A continuación aplicamos la función kNN() a nuestro dataset:
+
+```{r}
+trabajadores_knn <-kNN(trabajadores)
+```
+Comprobamos los resultados:
+
+```{r}
+summary(trabajadores_knn)
+```
+Vemos que la función ha imputados los valores que faltaban a la variable *happiness* y que además nos ha añadido al dataset el equivalente de las variables a imputar, identificadas por nombre_variable_imp.
+
+Finalmente, cargamos en nuestro dataset definitivo las columnas con los valores normalizados, estandarizados e imputados:
+```{r}
+trabajadores<-subset(trabajadores_knn, select=city:Cho_final)
+```
+
+Comprobamos que se han cargado correctamente los datos:
+
+```{r}
+summary(trabajadores)
+```
+
+## 7. Búsqueda de valores atípicos.  
+
+En este apartado buscaremos, para de cada una de las variables cuantitativas del dataset, los valores atípicos si es que los tiene. Para ello realizaremos un boxplot y un cuadro con las estimaciones de los indicadores robustos y no robustos de tendecia central y dispersión, para cada una de estas variables.
+
+### 7.1 Satisfacción laboral (happiness)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$happiness, main="Satisfacción laboral", 
+        xlab="Nº de trabajadores", ylab="Valoración")
+```
+
+A continuación vamos a calcular los diferentes estimadores robustos y no robustos de tendencia central y de dispersión.
+
+Para ello necesitamos cargar la librería pysch para el cálculo de la media winsorizada:
+
+```{r}
+library(psych)
+```
+
+El siguiente paso es calcular los indicadores:
+```{r}
+v_mean<-mean(trabajadores$happiness)
+v_median <-median(trabajadores$happiness)
+v_cropmean<- mean(trabajadores$happiness, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$happiness, trim=0.05)
+v_sd <- sd(trabajadores$happiness)
+v_IQR <- IQR(trabajadores$happiness)
+v_mad <- mad(trabajadores$happiness)
+```
+Para crear la tabla, crearemos una cabecera, con el nombre de los indicadores, que reutilizaremos para las otras variables:
+
+```{r}
+header <-c("Media aritmética", "Mediana", "Media recortada", 
+           "Media winsorizada", "Desviación estándar", 
+           "Rango intercuartílico (RIC)", "Desviación absoluta respecto de la mediana (DAM)")
+
+```
+
+Creamos un vector con los valores de las estimaciones:
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Finalmente creamos un dataframe con las estimaciones y la cabecera:
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+```
+Cargamos la librería knitr para crear la tabla:
+```{r message=FALSE, warning=FALSE}
+library(knitr)
+```
+
+
+Finalmente tenemos que las estimaciones para la variable *happiness* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable happiness")
+```
+  
+### 7.2 Edad (age)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$age, main="Edad de los trabajadores", 
+        xlab="Nº de trabajadores", ylab="Edad")
+```
+
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$age)
+v_median <-median(trabajadores$age)
+v_cropmean<- mean(trabajadores$age, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$age, trim=0.05)
+v_sd <- sd(trabajadores$age)
+v_IQR <- IQR(trabajadores$age)
+v_mad <- mad(trabajadores$age)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *age* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable age")
+```
+
+### 7.3 Antiguedad (seniority)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$seniority, main="Antiguedad de los empleados", 
+        xlab="Nº de trabajadores", ylab="Años de antiguedad")
+```
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$seniority)
+v_median <-median(trabajadores$seniority)
+v_cropmean<- mean(trabajadores$seniority, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$seniority, trim=0.05)
+v_sd <- sd(trabajadores$seniority)
+v_IQR <- IQR(trabajadores$seniority)
+v_mad <- mad(trabajadores$seniority)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *seniority* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable seniority")
+```
+
+### 7.4 Dias de baja en el último año laboral (sick_leave)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$sick_leave, main="Dias de baja en el último año laboral", 
+        xlab="Nº de trabajadores", ylab="Dias de baja")
+```
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$sick_leave)
+v_median <-median(trabajadores$sick_leave)
+v_cropmean<- mean(trabajadores$sick_leave, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$sick_leave, trim=0.05)
+v_sd <- sd(trabajadores$sick_leave)
+v_IQR <- IQR(trabajadores$sick_leave)
+v_mad <- mad(trabajadores$sick_leave)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *sick_leave* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable sick_leave")
+```
+
+### 7.5 Horas de trabajo a la semana (work_hours)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$work_hours, main="Horas trabajadas a la semana", 
+        xlab="Nº de trabajadores", ylab="Horas trabajadas")
+```
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$work_hours)
+v_median <-median(trabajadores$work_hours)
+v_cropmean<- mean(trabajadores$work_hours, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$work_hours, trim=0.05)
+v_sd <- sd(trabajadores$work_hours)
+v_IQR <- IQR(trabajadores$work_hours)
+v_mad <- mad(trabajadores$work_hours)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *work_hours* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable work_hours")
+```
+
+### 7.6 Nivel de colesterol en la penúltima revisión (Cho_initial)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$Cho_initial, 
+        main="Nivel de colesterol de los trabajadores en la penúltima revisión", 
+        xlab="Nº de trabajadores", ylab="Nivel de colesterol")
+```
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$Cho_initial)
+v_median <-median(trabajadores$Cho_initial)
+v_cropmean<- mean(trabajadores$Cho_initial, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$Cho_initial, trim=0.05)
+v_sd <- sd(trabajadores$Cho_initial)
+v_IQR <- IQR(trabajadores$Cho_initial)
+v_mad <- mad(trabajadores$Cho_initial)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *Cho_initial* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable Cho_initial")
+```
+
+### 7.7 Niveles de colesterol en la última revisión médica (Cho_final)
+
+Dibujamos el boxplot:
+
+```{r}
+boxplot(trabajadores$Cho_final, 
+        main="Nivel de colesterol de los trabajadores en la última revisión", 
+        xlab="Nº de trabajadores", ylab="Nivel de colesterol")
+```
+Calculamos los diferentes estimadores robustos y no robustos de tendencia central y de dispersión: 
+
+```{r}
+v_mean<-mean(trabajadores$Cho_final)
+v_median <-median(trabajadores$Cho_final)
+v_cropmean<- mean(trabajadores$Cho_final, trim=0.05)
+v_winsor <- winsor.mean(trabajadores$Cho_final, trim=0.05)
+v_sd <- sd(trabajadores$Cho_initial)
+v_IQR <- IQR(trabajadores$Cho_final)
+v_mad <- mad(trabajadores$Cho_final)
+```
+Cargamos los valores en el vector de valores que creamos en el apartado 7.1
+
+```{r}
+values <- c(v_mean, v_median, v_cropmean, v_winsor, v_sd, v_IQR, v_mad)
+```
+
+Actualizamos el dataframe con las estimaciones y la cabecera correspondientes a este valor
+
+```{r}
+estimaciones <- data.frame(Indicadores=header, Resultado=values)
+
+```
+
+Finalmente tenemos que las estimaciones para la variable *Cho_final* son:
+
+```{r warning=FALSE}
+kable(estimaciones, 
+      caption="Estimaciones robustas y no robustas de tendencia central 
+      y dispersión para la variable Cho_final")
+```
+
+## 8. Breve estudio descriptivo
+
+A continuación, con los datos ya depurados vamos a realizar un breve estudio descriptivo sobre las variables del dataset.
+
+Para las gráficas que vamos a elaborar, emplearemos la librería *ggplot2* que cargaremos a continuación
+
+```{r message=FALSE, warning=FALSE}
+library(ggplot2)
+
+```
+
+### 8.1 Felicidad de los empleados
+
+Vamos a empezar con la distribución de la felicidad en base a la edad y por sexos:
+
+```{r}
+ggplot(trabajadores, aes(age, happiness)) + geom_bar(stat = "identity", aes(fill = sex))
+```
+
+La gráfica nos muestra que los niveles de felicidad se van incrementándo a la par que lo hace la edad del empleado, hasta un tope en torno a los 44 años, a partir del cual empieza a descender de manera progresiva hasta unos mínimos equiparabls a los de la gente más joven. 
+
+Con este primer vistazo podemos aventurar que los trabajadores más felices son aquellos cuya edad oscila entre los 35 y 45 años de edad.
+
+Vamos a ver ahora como puede influir la ciudad en la que viven los trabajadores en la satisfacción laboral:
+
+```{r}
+ggplot(trabajadores, aes(happiness)) + geom_density(aes(fill=factor(city)), alpha=0.8) +
+labs(title = "Gráfica de densidad",
+      subtitle = "Nivel de satisfacción laboral agrupada por ciudades", 
+      caption = "Fuente: trabajadores",
+      x="Nivel de satisfacción",
+     fill="Ciudades")
+```
+
+Con esto observamos que Madrid y Barcelona son las ciudades con un nivel de satisfacción mayor de sus empleados.
+
+Por último, vamos a ver como distribuyen los niveles de satisfacción en función del nivel de estudios:
+
+```{r}
+ggplot(trabajadores, aes(happiness)) + geom_density(aes(fill=factor(educ_level)), alpha=0.8) +
+     labs(title = "Gráfica de densidad",
+     subtitle = "Nivel de satisfacción laboral agrupada por nivel de estudios", 
+     caption = "Fuente: trabajadores",
+     x="Nivel de satisfacción",
+     fill="Nivel de estudios")
+```
+
+Los resultados nos muestran que los trabajadores con un nivel de estudios universitarios son los que mayor nivel de satisfacción tienen.
+
+### 8.2 Horas de baja 
+
+A continuación vamos a ver como se distribuyen las horas de baja en el trabajo en función de la edad y por sexo:
+
+```{r}
+ggplot(trabajadores, aes(age, sick_leave)) + geom_bar(stat = "identity", aes(fill = sex))
+```
+Vemos los hombres cogen más días de baja en el año laboral que las mujeres y que los picos de días se producen tanto a los 31, como a los 38 años, siendo esta última edad a más significativa. Esto nos hace pensar que la edad a la que los empleados deciden tener hijos se ha desplazado a los 38-39 años y por lo tanto las cifras coinciden con lo que se espera de horas de baja por motivos de paternidad/maternidad.
+
+Vamos a explorar ahora 
+
+
+### 8.3 Horas de trabajo
+
+Vamos a ver ahora si hay alguna diferencia entre el número de horas trabajadas:
+
+```{r}
+ggplot(trabajadores, aes(age, work_hours)) + geom_point(aes(col = sex))
+```
+
+Vemos que el número de horas que se trabaja a la semana permanece casi constante entre las 30 y las 40 horas semanales, con la excepción de algunos casos que superan las 60 horas semanales.
+
+
+### 8.4 Horas de trabajo vs Felicidad
+
+Ya hemos visto anteriormente que los niveles de felicidad son mas elevados en cuanto a la edad de los trabajadores, ahora vamos a ver si hay algún tipo de relación entre las horas de trabajo y la felicidad:
+
+```{r}
+ggplot(trabajadores, aes(happiness, work_hours)) + geom_point(aes(col = sex))
+```
+
+Vemos que los valores centrales de felicidad se distribuyen, salvo valores atípicos de manera uniforme en las horas de trabajo, luego el número de horas trabajadas no afecta de manera significativa a la valoración de la felicidad.
+
+
+### 8.5 Baja y felicidad
+
+Con la información que hemos obtenido en los apartados anteriores, vamos a ver los trabajadores que han cogido baja y sus niveles de felicidad:
+
+```{r}
+ggplot(trabajadores, aes(sick_leave_b, happiness)) + geom_bar(stat = "identity", aes(fill = sex))
+```
+
+Los resultados nos muestran que los trabajadores que no han cogido baja son aquellos con una satisfacción laboral superior a los que si que la han cogido.
+
+
+### 8.6 Niveles de colesterol
+
+Vamos a ver ahora los valores de los niveles de colesterol de la penúnltima revisión médica en función de la edad y del sexo.
+
+Primero los niveles iniciales:
+
+```{r}
+ggplot(trabajadores, aes(age, Cho_initial)) + geom_bar(stat = "identity", aes(fill = sex))
+```
+
+Y ahora vamos a ver los niveles de colesterol de la última revisión médica
+
+
+```{r}
+ggplot(trabajadores, aes(age, Cho_final)) + geom_bar(stat = "identity", aes(fill = sex))
+```
+
+Vemos que no hay cambios significativos en los niveles de colesterol de los empleados, de una revisión a otra.
+
+### 8.7 Conclusiones
+
+Tras este breve análisis podemos concluir que la satisfacción laboral puede estár relacionada con la edad de los empleados, la ciudad en la que estos trabajan y su nivel de estudios. Quizás esto se deba a que a mayor nivel de estudios, mayor categoría profesional y por lo tanto mayor salario. Sin embargo como no tenemos los datos relacionados con el salario, no podemos confirmar esta hipótesis.
+
+También hemos observado que el tanto el número de horas trabajadas, como los niveles de colesterol no influyen de manera significativa en los niveles de satisfacción laboral de los empleados.
+
+## 9. Creación del archivo corregido
+
+Como último paso, después de haber transformado y estandarizado los tipos y los valores de las variables, creamos el archivo de datos corregido, indicando como separador de columnas la coma (,).
+
+```{r}
+write.table(trabajadores, 
+  "/Users/manu/Documents/UOC - Ciencia de Datos/2 - Estadistica avanzada/PEC 1/martinguerra_luismanuel_clean.csv",
+   sep=",", col.names=TRUE, row.names=FALSE, quote=TRUE, na="NA")
+```
+
+Con esto se da por concluida la etapa de preprocesamiento de los datos.
